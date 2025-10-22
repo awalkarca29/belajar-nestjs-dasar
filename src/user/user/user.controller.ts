@@ -1,15 +1,20 @@
 import {
+  Body,
   Controller,
   Get,
   Header,
   HttpCode,
+  HttpException,
   Inject,
   Param,
+  ParseIntPipe,
   Post,
   Query,
   Redirect,
   Req,
   Res,
+  UseFilters,
+  UsePipes,
 } from '@nestjs/common';
 
 import type { HttpRedirectResponse } from '@nestjs/common';
@@ -20,6 +25,9 @@ import { MailService } from '../mail/mail.service';
 import { UserRepository } from '../user-repository/user-repository';
 import { MemberService } from '../member/member.service';
 import { User } from 'generated/prisma';
+import { ValidationFilter } from 'src/validation/validation.filter';
+import { LoginUserRequest, loginUserRequestValidation } from 'src/model/login.model';
+import { ValidationPipe } from 'src/validation/validation.pipe';
 
 @Controller('/api/users')
 export class UserController {
@@ -31,6 +39,13 @@ export class UserController {
     private userRepository: UserRepository,
     private memberService: MemberService,
   ) {}
+
+  @UsePipes(new ValidationPipe(loginUserRequestValidation))
+  @UseFilters(ValidationFilter)
+  @Post('/login')
+  login(@Query('name') name: string, @Body() request: LoginUserRequest) {
+    return `Hello ${request.username}`;
+  }
 
   @Get('/connection')
   async getConnection(): Promise<string> {
@@ -48,10 +63,20 @@ export class UserController {
     @Query('first_name') firstName: string,
     @Query('last_name') lastName: string,
   ): Promise<User> {
+    if (!firstName) {
+      throw new HttpException(
+        {
+          code: 400,
+          errors: 'first name is required',
+        },
+        400,
+      );
+    }
     return this.userRepository.save(firstName, lastName);
   }
 
   @Get('/hello')
+  // @UseFilters(ValidationFilter)
   async sayHello(@Query('name') name: string): Promise<string> {
     return this.service.sayHello(name);
   }
@@ -89,7 +114,8 @@ export class UserController {
   }
 
   @Get('/:id')
-  getById(@Param('id') id: string): string {
+  getById(@Param('id', ParseIntPipe) id: number): string {
+    console.info(id * 10);
     return `GET ${id}`;
   }
 
